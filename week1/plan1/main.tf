@@ -13,23 +13,24 @@ variable "awsprops" {
     type =  map(string)
     default = {
     region = "us-east-1"
-    vpc = "vpc-5234832d" //-> mesti bikin
-    ami = "ami-0c1bea58988a989155" // ec2 ami locator : https://cloud-images.ubuntu.com/locator/ec2/
+    vpc = "vpc-5234832d" //-> must be create first
+    ami = "ami-0aa2b7722dc1b5612" // ec2 ami locator : https://cloud-images.ubuntu.com/locator/ec2/
     itype = "t2.micro"
-    subnet = "subnet-81896c8e" //-> mesti bikin
+    subnet = "subnet-81896c8e" //-> must be create first
     publicip = true
-    keyname = "myseckey"
+    keyname = "test-dev-key" //-> must be create first
     secgroupname = "IAC-Sec-Group"
   }
 }
 
 resource "aws_vpc" "vpc" {
-  cidr_block              = "10.0.1.0/24"
+  cidr_block              = "10.1.0.0/16"
   instance_tenancy     = "default" #default,dedicated
   enable_dns_hostnames = true
   enable_dns_support   = true
 
   tags = {
+    Name        = "my-vpc"
     Environment = "DEV"
     Managed = "IAC"
   }
@@ -39,9 +40,24 @@ resource "aws_vpc" "vpc" {
 # Public Subnet
 resource "aws_subnet" "public_subnet" {
   vpc_id                  = aws_vpc.vpc.id
-  cidr_block              = "10.0.1.0/24"
+  cidr_block              = "10.1.0.0/24"
 
   tags = {
+    Name        = "my-public-subnet"
+    Environment = "DEV"
+    Managed = "IAC"
+  }
+  depends_on = [ aws_vpc.vpc ]
+  }
+
+# Private Subnet
+resource "aws_subnet" "private_subnet" {
+  vpc_id                  = aws_vpc.vpc.id
+  cidr_block              = "10.1.2.0/24"
+
+
+  tags = {
+    Name        = "my-private-subnet"
     Environment = "DEV"
     Managed = "IAC"
   }
@@ -70,7 +86,7 @@ resource "aws_security_group" "project-iac-sg" {
   // To Allow Port 80 Transport
   ingress {
     from_port = 80
-    protocol = ""
+    protocol = "tcp"
     to_port = 80
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -88,6 +104,8 @@ resource "aws_security_group" "project-iac-sg" {
   depends_on = [ aws_vpc.vpc ]  
 }
 
+
+
 // https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance
 resource "aws_instance" "project-iac" {
   ami = lookup(var.awsprops, "ami")
@@ -102,9 +120,8 @@ resource "aws_instance" "project-iac" {
   ]
   root_block_device {
     delete_on_termination = true
-    iops = 150
     volume_size = 50
-    volume_type = "gp2"
+    volume_type = "gp3"
   }
   tags = {
     Name ="SERVER01"
